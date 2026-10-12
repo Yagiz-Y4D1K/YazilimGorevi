@@ -1,1 +1,1 @@
-# Yaz-l-mG-revi
+# YazilimGorevi
