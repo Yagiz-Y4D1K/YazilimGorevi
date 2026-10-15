@@ -31,27 +31,28 @@ while cap.isOpened():
     cv.imshow('HSV',hsv)
     
     # Renk aralığı
-    lower_red = np.array([0,150,150])
+    lower_red = np.array([0,100,100])
     upper_red = np.array([10,255,255])
     
     mask = cv.inRange(hsv,lower_red,upper_red)
     
     kernel = np.ones((5,5),np.uint8)
-    mask =cv.erode(mask,kernel,iterations=1)
-    mask=cv.dilate(mask,kernel,iterations=1)
+    mask =cv.erode(mask,kernel,iterations=2)
+    mask=cv.dilate(mask,kernel,iterations=2)
+    cv.imshow('Mask',mask) # Sistemin çalışma mantığı daha net anlaşılması için yeni bir pencere ekledim. Nesne belirtilen renk aralığındaysa bu ekran üzerinde beyaz şekilde görünecek.
     
-    # Kontür bulma ve karenin merkezinin hesaplanması
+    # Kontür bulma ve nesnenin merkezinin hesaplanması
     contours,_ = cv.findContours(mask,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE)
     
     kare_bulundu = False
     
     if contours:
-      # En büyük alan bulunur. (nesnemizin düzgün tanınması için en büyük alan seçilir.)
+      # En büyük alan bulunur. (nesnenin düzgün tanınması için en büyük alan seçilir.)
       largest_contour = max(contours, key=cv.contourArea)
       area = cv.contourArea(largest_contour)
 
       # Alan yeterince büyükse kare işleme alınır. 
-      if area > 1000:
+      if area > 450:
         kare_bulundu = True
 
         # Karenin etrafına kontür çizilir.
@@ -66,8 +67,34 @@ while cap.isOpened():
           # Nesnenin merkez noktası ekranda işaretlenir.
           cv.circle(frame, (cx, cy), 7, (0, 0, 255), -1)
           
+          # Nesne merkezinin hangi hücrede olduğu belirlenir.
+          # (Sütun olarak kaçıncı sütunda olduğu bulunur.)
+          if cx < x1:
+              col=1
+          elif cx < x2:
+              col=2
+          else:
+              col=3
+        
+          # (Satır olarak kaçıncı satırda olduğu bulunur.)
+          if cy < y1:
+              row=1
+          elif cy < y2:
+              row=2
+          else:
+              row=3
+          
+          cell_num=(row - 1)*3 + col  #3x3 gridli ekranda her hücrenin 1den 9a kadar numaralandırılması
+          
+          # Nesnenin hücre numarası, satır ve sütun numarası ekrana yazdırılır.
+          info_text = f"Hucre: {cell_num} (Satır {row}, Sutun {col})"
+          cv.putText(frame, info_text, (20,40), cv.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,255), 2)
+          
+    # Kare görüntüde yoksa "Kare aranıyor" yazısı yazılır. 
+    if not kare_bulundu:
+        cv.putText(frame, "Kare aranıyor", (20,40), cv.FONT_HERSHEY_SIMPLEX, 0.8, (255,0,0), 2)
+        
     
-
     # Ekranda göster
     cv.imshow("3x3 gridli ekran", frame)
 
