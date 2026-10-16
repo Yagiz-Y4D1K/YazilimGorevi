@@ -3,6 +3,10 @@ import numpy as np
 
 cap = cv.VideoCapture(0)
 
+# Hareketli ortalama (titreşimi önlemek için) için önceki koordinat değişkenleri
+prev_cx, prev_cy = 0, 0
+alpha = 0.25  # Yumuşatma katsayısı (0.1 ile 0.5 arası)
+
 print("Kayıt başladı. Çıkmak için 'q' tuşuna basın.")
 
 while cap.isOpened():
@@ -53,46 +57,69 @@ while cap.isOpened():
 
       # Alan yeterince büyükse kare işleme alınır. 
       if area > 450:
-        kare_bulundu = True
-
-        # Karenin etrafına kontür çizilir.
-        cv.drawContours(frame, [largest_contour], -1, (0, 255, 0), 3)
-
-        # Momentler yardımıyla nesnemizin merkez koordinatı bulunur.
-        M = cv.moments(largest_contour)
-        if M["m00"] != 0:
-          cx = int(M["m10"] / M["m00"])
-          cy = int(M["m01"] / M["m00"])
-
-          # Nesnenin merkez noktası ekranda işaretlenir.
-          cv.circle(frame, (cx, cy), 7, (0, 0, 255), -1)
           
-          # Nesne merkezinin hangi hücrede olduğu belirlenir.
-          # (Sütun olarak kaçıncı sütunda olduğu bulunur.)
-          if cx < x1:
-              col=1
-          elif cx < x2:
-              col=2
-          else:
-              col=3
+       x_box, y_box, w_box, h_box = cv.boundingRect(largest_contour)
+
+       if h_box > 0 and w_box > 0:
+          #  En-Boy Oranı Kontrolü (Genişlik ve yükseklik neredeyse eşit olmalı)
+          en_boy_orani = float(w_box) / h_box
+
+          #  Doluluk Oranı (Karenin kutuyu doldurma oranı - daire ve uzun şekilleri eler)
+          box_area = w_box * h_box
+          extent = float(area) / box_area
+
+          # Şeklin gerçek bir kareye yakın olup olmadığı denetlenir.( Normalde en boy oranı 1 olmalı ama kareye yakın nesneleri de algılaması için böyle yapıyorum.) 
+          if (0.80 <= en_boy_orani <= 1.20) and (extent > 0.70):
+            kare_bulundu = True
+
+          # Karenin etrafına kontür çizilir.
+          cv.drawContours(frame, [largest_contour], -1, (0, 255, 0), 3)
+
+          # Momentler yardımıyla nesnemizin merkez koordinatı bulunur.
+          M = cv.moments(largest_contour)
+          if M["m00"] != 0:
+            raw_cx = int(M["m10"] / M["m00"])
+            raw_cy = int(M["m01"] / M["m00"])
+            
+            # İlk kare başlangıç kontrolü
+            if prev_cx == 0 and prev_cy == 0:
+              prev_cx, prev_cy = raw_cx, raw_cy
+
+            # Titreşimi önlemek için Hareketli Ortalama (Yumuşatma)uygula
+            cx = int(prev_cx * (1 - alpha) + raw_cx * alpha)
+            cy = int(prev_cy * (1 - alpha) + raw_cy * alpha)
+            prev_cx, prev_cy = cx, cy
+
+            # Nesnenin merkez noktası ekranda işaretlenir.
+            cv.circle(frame, (cx, cy), 7, (0, 0, 255), -1)
+          
+            # Nesne merkezinin hangi hücrede olduğu belirlenir.
+            # (Sütun olarak kaçıncı sütunda olduğu bulunur.)
+            if cx < x1:
+                col=1
+            elif cx < x2:
+                col=2
+            else:
+                col=3
         
-          # (Satır olarak kaçıncı satırda olduğu bulunur.)
-          if cy < y1:
-              row=1
-          elif cy < y2:
-              row=2
-          else:
-              row=3
+            # (Satır olarak kaçıncı satırda olduğu bulunur.)
+            if cy < y1:
+                row=1
+            elif cy < y2:
+                row=2
+            else:
+                row=3
           
-          cell_num=(row - 1)*3 + col  #3x3 gridli ekranda her hücrenin 1den 9a kadar numaralandırılması
-          
-          # Nesnenin hücre numarası, satır ve sütun numarası ekrana yazdırılır.
-          info_text = f"Hucre: {cell_num} (Satır {row}, Sutun {col})"
-          cv.putText(frame, info_text, (20,40), cv.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,255), 2)
+            cell_num=(row - 1)*3 + col  #3x3 gridli ekranda her hücrenin 1den 9a kadar numaralandırılması
+         
+    if kare_bulundu:
+     # Nesnenin hücre numarası, satır ve sütun numarası ekrana yazdırılır.
+     info_text = f"Hucre: {cell_num} (Satır {row}, Sutun {col})" 
+     cv.putText(frame, info_text, (20,40), cv.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,255), 2)
           
     # Kare görüntüde yoksa "Kare aranıyor" yazısı yazılır. 
-    if not kare_bulundu:
-        cv.putText(frame, "Kare aranıyor", (20,40), cv.FONT_HERSHEY_SIMPLEX, 0.8, (255,0,0), 2)
+    else:
+     cv.putText(frame, "Kare aranıyor", (20,40), cv.FONT_HERSHEY_SIMPLEX, 0.8, (255,0,0), 2)
         
     
     # Ekranda göster
